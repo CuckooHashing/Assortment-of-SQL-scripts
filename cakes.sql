@@ -1,0 +1,78 @@
+CREATE DATABASE CakeShop
+GO
+
+CREATE TABLE CakeTypes(
+CTID INT PRIMARY KEY,
+Name VARCHAR(20),
+Description VARCHAR(20)
+)
+
+CREATE TABLE Cakes(
+CID INT PRIMARY KEY,
+Name VARCHAR(20),
+Shape VARCHAR(20),
+Price INT,
+CTID INT FOREIGN KEY REFERENCES CakeTypes(CTID)
+)
+
+CREATE TABLE Chefs(
+CFID INT PRIMARY KEY,
+Name VARCHAR(20),
+Gender VARCHAR(6),
+Birthday DATE
+)
+
+CREATE TABLE MakingCakes(
+CFID INT FOREIGN KEY REFERENCES Chefs(CFID),
+CID INT FOREIGN KEY REFERENCES Cakes(CID),
+CONSTRAINT pk_Making PRIMARY KEY(CFID, CID)
+)
+
+CREATE TABLE Orders(
+OID INT PRIMARY KEY,
+OrderDate DATE
+)
+
+CREATE TABLE OrderedCakes(
+CID INT FOREIGN KEY REFERENCES Cakes(CID),
+OID INT FOREIGN KEY REFERENCES Orders(OID),
+CONSTRAINT pk_ordered PRIMARY KEY(CID, OID),
+Pieces INT
+)
+
+CREATE PROCEDURE addPieces @orderID INT, @CakeName VARCHAR(20), @P INT
+AS
+BEGIN
+DECLARE @n INT
+SET @n = (SELECT COUNT(*)
+			FROM (SELECT o.CID
+					FROM OrderedCakes o INNER JOIN Cakes c ON o.CID = c.CID
+					WHERE o.OID = @orderID AND c.Name = @CakeName) t1)
+DECLARE @id INT
+SET @id = (SELECT MAX(CID) 
+				FROM Cakes
+				WHERE Name = @CakeName)
+
+IF @n = 0 BEGIN
+		INSERT INTO OrderedCakes VALUES (@id, @orderID, @P)
+END
+ELSE
+BEGIN
+	DECLARE @numberPieces INT = (SELECT MAX(Pieces) FROM OrderedCakes WHERE OID = @orderID AND CID = @id
+	)
+	UPDATE OrderedCakes
+	SET Pieces = @numberPieces + @P
+	WHERE OID = @orderID AND CID = @id
+	
+END
+END
+GO
+
+CREATE FUNCTION ChefsAll() RETURNS TABLE AS RETURN
+
+SELECT cf.Name
+FROM Chefs cf INNER JOIN MakingCakes mc ON cf.CFID = mc.CFID INNER JOIN Cakes c ON mc.CID = c.CID
+GROUP BY cf.Name
+HAVING COUNT(mc.CID) = (SELECT COUNT(*) FROM Cakes)
+
+GO
